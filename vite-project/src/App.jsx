@@ -1,5 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import './App.css';
+import UIKitGallery from './components/UIKitGallery.jsx';
+
+async function readAuthResponse(response) {
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || 'Не удалось выполнить запрос.');
+  return result;
+}
 
 // Иконки SVG (Встроенные компоненты для гарантированной работы без внешних библиотек)
 const IconSun = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>;
@@ -142,6 +149,11 @@ export default function App() {
   // Авторизация / Пользователь
   const [user, setUser] = useState({ name: 'Гость', role: 'User', isLoggedIn: false });
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState('login');
+  const [authForm, setAuthForm] = useState({ name: '', email: '', password: '' });
+  const [authError, setAuthError] = useState('');
+  const [authChecking, setAuthChecking] = useState(true);
+  const [authSubmitting, setAuthSubmitting] = useState(false);
 
   // Отзывы
   const [reviews, setReviews] = useState([
@@ -172,14 +184,36 @@ export default function App() {
     document.body.className = darkMode ? 'dark-theme' : 'light-theme';
   }, [darkMode]);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/auth/me')
+      .then(async response => {
+        if (response.status === 401) return null;
+        const result = await readAuthResponse(response);
+        return result.user;
+      })
+      .then(authenticatedUser => {
+        if (cancelled) return;
+        if (authenticatedUser) setUser({ ...authenticatedUser, isLoggedIn: true });
+        setAuthChecking(false);
+      })
+      .catch(error => {
+        if (cancelled) return;
+        setAuthError(`Сервер авторизации недоступен: ${error.message}`);
+        setAuthChecking(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // --- Fetch данных из TheMealDB API ---
   useEffect(() => {
-    setLoading(true);
     fetch('https://www.themealdb.com/api/json/v1/1/search.php?s=a')
       .then(res => res.json())
       .then(data => {
         if (data.meals) {
-          const apiDishes = data.meals.slice(0, 12).map((meal, idx) => ({
+          const apiDishes = data.meals.slice(0, 12).map(meal => ({
             id: meal.idMeal,
             name: meal.strMeal,
             category: meal.strCategory || 'Разное',
@@ -300,6 +334,42 @@ export default function App() {
     setNewComment('');
   };
 
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    setAuthSubmitting(true);
+    try {
+      const isRegistration = authMode === 'register';
+      const response = await fetch(`/api/auth/${isRegistration ? 'register' : 'login'}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(isRegistration ? authForm : { email: authForm.email, password: authForm.password }),
+      });
+      const result = await readAuthResponse(response);
+      setUser({ ...result.user, isLoggedIn: true });
+      setAuthForm({ name: '', email: '', password: '' });
+      setShowAuthModal(false);
+      setActiveTab('menu');
+    } catch (error) {
+      setAuthError(error.message);
+    } finally {
+      setAuthSubmitting(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    setAuthError('');
+    try {
+      const response = await fetch('/api/auth/logout', { method: 'POST' });
+      await readAuthResponse(response);
+      setUser({ name: 'Гость', role: 'User', isLoggedIn: false });
+      setActiveTab('menu');
+      setShowAuthModal(false);
+    } catch (error) {
+      setAuthError(error.message);
+    }
+  };
+
   return (
     <div className="app-container">
       {/* 1. Header / Navbar */}
@@ -311,6 +381,7 @@ export default function App() {
         <nav className={`nav-links ${mobileMenuOpen ? 'open' : ''}`}>
           <button className={activeTab === 'menu' ? 'active' : ''} onClick={() => { setActiveTab('menu'); setMobileMenuOpen(false); }}>{t.nav_menu}</button>
           <button className={activeTab === 'booking' ? 'active' : ''} onClick={() => { setActiveTab('booking'); setMobileMenuOpen(false); }}>{t.nav_booking}</button>
+          <button className={activeTab === 'components' ? 'active' : ''} onClick={() => { setActiveTab('components'); setMobileMenuOpen(false); }}>Компоненты</button>
           {user.role === 'Admin' && (
             <button className={activeTab === 'admin' ? 'active' : ''} onClick={() => { setActiveTab('admin'); setMobileMenuOpen(false); }}>{t.nav_admin}</button>
           )}
@@ -330,7 +401,7 @@ export default function App() {
           </button>
 
           {/* Авторизация */}
-          <button className="auth-btn" onClick={() => setShowAuthModal(true)}>
+          <button className="auth-btn" disabled={authChecking} onClick={() => { setAuthError(''); setShowAuthModal(true); }}>
             <IconUser /> {user.isLoggedIn ? `${user.name} (${user.role})` : t.login}
           </button>
 
@@ -463,7 +534,7 @@ export default function App() {
         )}
 
         {/* --- ТАБ 3: АДМИН-ПАНЕЛЬ (CRUD & Analytics) --- */}
-        {activeTab === 'admin' && user.role === 'Admin' && (
+        {activeTab === 'admin' && user.isLoggedIn && user.role === 'Admin' && (
           <section className="admin-section">
             <h2>⚙️ {t.admin_title}</h2>
             
@@ -529,6 +600,7 @@ export default function App() {
             </table>
           </section>
         )}
+        {activeTab === 'components' && <UIKitGallery />}
       </main>
 
       {/* 3. Модальное окно деталей товара и отзывов */}
@@ -632,18 +704,57 @@ export default function App() {
             <button className="modal-close" onClick={() => setShowAuthModal(false)}><IconClose /></button>
             <h2>{user.isLoggedIn ? 'Профиль' : 'Вход в аккаунт'}</h2>
             {!user.isLoggedIn ? (
-              <div className="auth-buttons">
-                <button className="btn-primary" onClick={() => { setUser({ name: 'Пользователь', role: 'User', isLoggedIn: true }); setShowAuthModal(false); }}>
-                  Войти как Клиент
+              <form className="auth-form" onSubmit={handleAuthSubmit}>
+                {authMode === 'register' && (
+                  <input
+                    type="text"
+                    placeholder="Ваше имя"
+                    autoComplete="name"
+                    minLength={2}
+                    maxLength={80}
+                    required
+                    value={authForm.name}
+                    onChange={e => setAuthForm({ ...authForm, name: e.target.value })}
+                  />
+                )}
+                <input
+                  type="email"
+                  placeholder="Email"
+                  autoComplete="email"
+                  required
+                  value={authForm.email}
+                  onChange={e => setAuthForm({ ...authForm, email: e.target.value })}
+                />
+                <input
+                  type="password"
+                  placeholder="Пароль"
+                  autoComplete={authMode === 'register' ? 'new-password' : 'current-password'}
+                  minLength={authMode === 'register' ? 10 : undefined}
+                  maxLength={128}
+                  required
+                  value={authForm.password}
+                  onChange={e => setAuthForm({ ...authForm, password: e.target.value })}
+                />
+                {authMode === 'register' && <p className="auth-hint">Email должен быть уникальным, пароль — не короче 10 символов. Регистрация создаёт обычный аккаунт.</p>}
+                {authError && <p className="auth-error" role="alert">{authError}</p>}
+                <button type="submit" className="btn-primary full-width" disabled={authSubmitting}>
+                  {authSubmitting ? 'Проверка...' : authMode === 'register' ? 'Создать аккаунт' : 'Войти'}
                 </button>
-                <button className="btn-secondary" onClick={() => { setUser({ name: 'Админатор', role: 'Admin', isLoggedIn: true }); setShowAuthModal(false); }}>
-                  Войти как Администратор
+                <button
+                  type="button"
+                  className="btn-secondary full-width"
+                  disabled={authSubmitting}
+                  onClick={() => { setAuthMode(authMode === 'login' ? 'register' : 'login'); setAuthError(''); }}
+                >
+                  {authMode === 'login' ? 'Создать аккаунт' : 'Уже есть аккаунт? Войти'}
                 </button>
-              </div>
+                <p className="auth-hint">Доступ администратора выдаётся только аккаунту, настроенному владельцем сервера.</p>
+              </form>
             ) : (
               <div>
-                <p>Вы вошли как: <strong>{user.name}</strong> ({user.role})</p>
-                <button className="btn-danger" onClick={() => { setUser({ name: 'Гость', role: 'User', isLoggedIn: false }); setShowAuthModal(false); }}>
+                <p>Вы вошли как: <strong>{user.name}</strong> ({user.email}, {user.role})</p>
+                {authError && <p className="auth-error" role="alert">{authError}</p>}
+                <button className="btn-danger" onClick={handleLogout}>
                   {t.logout}
                 </button>
               </div>
