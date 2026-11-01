@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
 import './App.css';
-import UIKitGallery from './components/UIKitGallery.jsx';
 
 async function readAuthResponse(response) {
   const result = await response.json();
@@ -118,13 +117,43 @@ const TRANSLATIONS = {
 
 // Моковые начальные данные (на случай сбоя API)
 const INITIAL_DISHES = [
-  { id: '101', name: 'Бешбармак по-нарынски', category: 'Национальная', price: 450, rating: 5, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=600&q=80', description: 'Традиционное блюдо из свежей конины и домашней лапши.' },
-  { id: '102', name: 'Лагман Уйгурский', category: 'Национальная', price: 320, rating: 4.8, image: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=600&q=80', description: 'Тянутая лапша с сочным мясом и овощным соусом Вару.' },
-  { id: '103', name: 'Плов Бишкекский', category: 'Национальная', price: 380, rating: 4.9, image: 'https://images.unsplash.com/photo-1633964913295-ceb43826e7c9?auto=format&fit=crop&w=600&q=80', description: 'Ароматный плов с бараниной, нутом и изюмом.' },
-  { id: '104', name: 'Пицца Пепперони', category: 'Пицца', price: 550, rating: 4.7, image: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?auto=format&fit=crop&w=600&q=80', description: 'Классическая пицца со стянутым сыром моцарелла и острой пикантной колбасой.' },
-  { id: '105', name: 'Бургер Nomad Double', category: 'Бургеры', price: 420, rating: 4.6, image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&q=80', description: 'Сочная двойная котлета из мраморной говядины с соусом BBQ.' },
-  { id: '106', name: 'Классический Чизкейк', category: 'Десерты', price: 250, rating: 4.9, image: 'https://images.unsplash.com/photo-1533134242443-d4fd215305ad?auto=format&fit=crop&w=600&q=80', description: 'Нежный творожный десерт с ягодами.' }
+  { id: '101', name: 'Бешбармак по-нарынски', category: 'Национальная', price: 450, rating: 5, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=600&q=80', description: 'Состав: конина, домашняя лапша, лук и мясной бульон.' },
+  { id: '102', name: 'Лагман Уйгурский', category: 'Национальная', price: 320, rating: 4.8, image: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=600&q=80', description: 'Состав: тянутая лапша, говядина, лук, перец, помидоры и специи.' },
+  { id: '103', name: 'Плов Бишкекский', category: 'Национальная', price: 380, rating: 4.9, image: 'https://images.unsplash.com/photo-1633964913295-ceb43826e7c9?auto=format&fit=crop&w=600&q=80', description: 'Состав: рис, баранина, морковь, нут, изюм, лук и специи.' },
+  { id: '104', name: 'Пицца Пепперони', category: 'Пицца', price: 550, rating: 4.7, image: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?auto=format&fit=crop&w=600&q=80', description: 'Состав: тесто, томатный соус, сыр моцарелла и колбаса пепперони.' },
+  { id: '105', name: 'Двойной бургер «Номад»', category: 'Бургеры', price: 420, rating: 4.6, image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&q=80', description: 'Состав: две котлеты из говядины, булочка, сыр, овощи и соус барбекю.' },
+  { id: '106', name: 'Классический чизкейк', category: 'Десерты', price: 250, rating: 4.9, image: 'https://images.unsplash.com/photo-1533134242443-d4fd215305ad?auto=format&fit=crop&w=600&q=80', description: 'Состав: творожный сыр, сливки, яйца, сахар и песочная основа.' }
 ];
+
+const RUSSIAN_MEAL_NAMES = {
+  53322: 'Карамельный флан',
+  53256: 'Цацики',
+  53436: 'Джаджек',
+  53220: 'Кабса',
+  53133: 'Аргентинское жаркое',
+  53443: 'Сатай',
+  53086: 'Мигас',
+  53439: 'Арепа',
+  52977: 'Чорба',
+  53139: 'Фарината',
+  53216: 'Кнафе',
+  53151: 'Паэлья',
+};
+
+const RUSSIAN_MEAL_INGREDIENTS = {
+  53322: 'Состав: молоко, яйца, сахар, ваниль и варёная сгущёнка.',
+  53256: 'Состав: натуральный йогурт, огурец, чеснок, лимонный сок, оливковое масло и сушёная мята.',
+  53436: 'Состав: йогурт, огурец, вода, чеснок, соль и сушёная мята.',
+  53220: 'Состав: курица, рис, сладкий перец, грибы, кукуруза, морковь, изюм и специи кабса.',
+  53133: 'Состав: говядина, чоризо и кровяная колбаса.',
+  53443: 'Состав: говядина, соевый соус, лук, чеснок, лимонный сок, сахар и молотый кориандр.',
+  53086: 'Состав: хлеб, оливковое масло, чеснок и свинина.',
+  53439: 'Состав: кукурузная мука, вода и соль.',
+  52977: 'Состав: чечевица, лук, морковь, томатная паста, овощной бульон и специи.',
+  53139: 'Состав: нутовая мука, вода, оливковое масло, соль и перец.',
+  53216: 'Состав: тесто кнафе, сливочное масло, моцарелла, сливочный сыр, молоко, сахар и розовая вода.',
+  53151: 'Состав: рис, креветки, мидии, кальмар, чоризо, лук, чеснок, помидоры, шафран и лимон.',
+};
 
 export default function App() {
   // --- Состояния приложения ---
@@ -213,15 +242,19 @@ export default function App() {
       .then(res => res.json())
       .then(data => {
         if (data.meals) {
-          const apiDishes = data.meals.slice(0, 12).map(meal => ({
-            id: meal.idMeal,
-            name: meal.strMeal,
-            category: meal.strCategory || 'Разное',
-            price: Math.floor(Math.random() * 300) + 200,
-            rating: (Math.random() * 1 + 4).toFixed(1),
-            image: meal.strMealThumb,
-            description: meal.strInstructions ? meal.strInstructions.slice(0, 100) + '...' : 'Вкуснейшее блюдо от нашего шеф-повара.'
-          }));
+          const apiDishes = data.meals.slice(0, 12).flatMap(meal => {
+            const name = RUSSIAN_MEAL_NAMES[meal.idMeal];
+            if (!name) return [];
+            return [{
+              id: meal.idMeal,
+              name,
+              category: meal.strCategory || 'Разное',
+              price: Math.floor(Math.random() * 300) + 200,
+              rating: (Math.random() * 1 + 4).toFixed(1),
+              image: meal.strMealThumb,
+              description: RUSSIAN_MEAL_INGREDIENTS[meal.idMeal]
+            }];
+          });
           const combined = [...INITIAL_DISHES, ...apiDishes];
           setDishes(combined);
 
@@ -381,7 +414,6 @@ export default function App() {
         <nav className={`nav-links ${mobileMenuOpen ? 'open' : ''}`}>
           <button className={activeTab === 'menu' ? 'active' : ''} onClick={() => { setActiveTab('menu'); setMobileMenuOpen(false); }}>{t.nav_menu}</button>
           <button className={activeTab === 'booking' ? 'active' : ''} onClick={() => { setActiveTab('booking'); setMobileMenuOpen(false); }}>{t.nav_booking}</button>
-          <button className={activeTab === 'components' ? 'active' : ''} onClick={() => { setActiveTab('components'); setMobileMenuOpen(false); }}>Компоненты</button>
           {user.role === 'Admin' && (
             <button className={activeTab === 'admin' ? 'active' : ''} onClick={() => { setActiveTab('admin'); setMobileMenuOpen(false); }}>{t.nav_admin}</button>
           )}
@@ -600,7 +632,6 @@ export default function App() {
             </table>
           </section>
         )}
-        {activeTab === 'components' && <UIKitGallery />}
       </main>
 
       {/* 3. Модальное окно деталей товара и отзывов */}
